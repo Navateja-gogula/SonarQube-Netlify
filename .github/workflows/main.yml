@@ -57,8 +57,8 @@ jobs:
       - name: Install Netlify CLI
         run: npm install -g netlify-cli
 
-      - name: Ensure react-scripts is installed
-        run: npm install react-scripts
+      - name: Install Dependencies
+        run: npm install
 
       - name: Build React App
         run: npm run build
