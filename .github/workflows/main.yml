@@ -1,42 +1,61 @@
-name: CI/CD for React App
+name: Deploy React App to Netlify
 
 on:
   push:
     branches:
-      - main
+      - main  # Change this to your deployment branch
 
 jobs:
-  build-and-deploy:
+  sonarQube:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run SonarQube Analysis
+        run: |
+          npm run build
+          npx sonar-scanner \
+            -Dsonar.projectKey=my-react-app \
+            -Dsonar.organization=my-org \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+  deploy:
+    name: Deploy to Netlify
+    needs: sonarQube  # Wait for SonarQube to complete
     runs-on: ubuntu-latest
 
     steps:
-    # Checkout the repository
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    # Setup Node.js
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-    # Install dependencies
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    # Run tests
-    - name: Run tests
-      run: npm test -- --watchAll=false
+      - name: Build React app
+        run: npm run build
 
-    # Build the app
-    - name: Build the app
-      run: npm run build
-
-    # Deploy to Netlify
-    - name: Deploy to Netlify
-      uses: nwtgck/actions-netlify@v3
-      with:
-        publish-dir: ./build
-        production-deploy: true
-        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v2
+        with:
+          publish-dir: ./build
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions"
+          netlify-auth-token: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          netlify-site-id: ${{ secrets.NETLIFY_SITE_ID }}
