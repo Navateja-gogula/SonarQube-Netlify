@@ -1,35 +1,64 @@
-name: Deploy to Netlify with SonarQube
+name: Deploy React App with SonarQube Analysis
 
 on:
   push:
     branches:
-      - main
+      - main  # Runs on push to main branch
+  pull_request:
+    branches:
+      - main  # Runs on PRs to main branch
 
 jobs:
-  deploy:
-    runs-on: self-hosted  # Use the self-hosted runner
+  build:
+    runs-on: self-hosted
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v3
+
+      - name: Set Up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18  # Use the latest stable Node.js version
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Run Build
+      - name: Build React App
         run: npm run build
 
+  sonar_scan:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install SonarQube Scanner
+        run: npm install -g sonarqube-scanner
+
       - name: Run SonarQube Analysis
+        env:
+          SONAR_HOST_URL: "http://localhost:9000"  # Change if running on a different server
+          SONAR_LOGIN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          npx sonar-scanner \
+          sonar-scanner \
             -Dsonar.projectKey=my-react-app \
             -Dsonar.sources=src \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.login=$SONAR_LOGIN
+
+  deploy:
+    needs: sonar_scan
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
 
       - name: Deploy to Netlify
-        uses: netlify/actions/cli@master
-        with:
-          args: deploy --prod --dir=build
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: netlify deploy --dir=build --prod
